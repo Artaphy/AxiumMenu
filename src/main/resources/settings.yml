@@ -1,0 +1,26 @@
+# AxiumMenu Configuration
+
+# Language setting for the plugin
+# Set this to the name of your language file (without .yml extension)
+# The plugin will fall back to en_US for any missing translations
+language: en_US
+
+# Database settings
+database:
+  # Database type. Options: mysql, sqlite
+  type: sqlite
+  
+  # MySQL settings (only used if type is set to mysql)
+  mysql:
+    host: localhost
+    port: 3306
+    database: axiummenu
+    username: root
+    password: password
+
+# Enable or disable auto-reload mode for menu files
+# When enabled, the plugin will automatically reload menus when their files are modified
+serve_mode: false
+
+# Configuration version (do not change manually)
+version: 1

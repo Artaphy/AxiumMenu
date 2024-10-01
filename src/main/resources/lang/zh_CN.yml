@@ -1,0 +1,19 @@
+config:
+  loaded: "&aAxiumMenu 配置加载成功！"
+command:
+  help:
+    title: "&6AxiumMenu 命令帮助："
+    open: "&d/axiummenu open <menu> &7- &f打开指定菜单"
+    reload: "&d/axiummenu reload &7- &f重新加载插件配置"
+    list: "&d/axiummenu list &7- &f显示所有可用菜单"
+  error:
+    player_only: "&c只有玩家可以打开菜单！"
+    menu_not_found: "&c找不到指定的菜单："
+  success:
+    menu_opened: "&a正在打开菜单："
+    config_reloaded: "&aAxiumMenu 配置已重新加载！"
+  list:
+    title: "&6可用的菜单列表："
+  serve:
+    enabled: "&a菜单文件自动重载模式已启用"
+    disabled: "&c菜单文件自动重载模式已禁用"

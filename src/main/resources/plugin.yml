@@ -1,0 +1,8 @@
+name: AxiumMenu
+version: '${version}'
+main: me.artaphy.axiumMenu.AxiumMenu
+api-version: '1.21'
+commands:
+  axiummenu:
+    aliases: [am]
+    usage: /<command> [open|reload|list]
