@@ -1,24 +1,31 @@
 package me.artaphy.axiumMenu.menu;
 
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.scheduler.BukkitRunnable;
-
 import me.artaphy.axiumMenu.AxiumMenu;
-import me.artaphy.axiumMenu.config.ConfigAdapter;
 import me.artaphy.axiumMenu.exceptions.MenuLoadException;
+import me.artaphy.axiumMenu.exceptions.MenuNotFoundException;
+import me.artaphy.axiumMenu.utils.Logger;
+import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Stream;
 
 /**
  * Manages the creation, loading, and retrieval of menus for the AxiumMenu plugin.
+ * This class handles menu caching, asynchronous loading, and provides thread-safe access to menus.
  */
 public class MenuManager {
 
     private final AxiumMenu plugin;
     private final Map<String, Menu> menus = new ConcurrentHashMap<>();
+    private final Map<String, Menu> menuCache = new ConcurrentHashMap<>();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     /**
      * Constructs a new MenuManager instance.
@@ -27,99 +34,110 @@ public class MenuManager {
      */
     public MenuManager(AxiumMenu plugin) {
         this.plugin = plugin;
+        // Schedule periodic cache cleaning task
+        scheduler.scheduleAtFixedRate(this::cleanCache, 5, 5, TimeUnit.MINUTES);
     }
 
     /**
      * Loads all menus from the menu configuration files.
      * This method clears existing menus and reloads them from the config files.
+     *
+     * @throws MenuLoadException if any menu fails to load
      */
-    public void loadMenus() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                menus.clear();
-                File menuFolder = new File(plugin.getDataFolder(), "menus");
-                if (!menuFolder.exists()) {
-                    boolean created = menuFolder.mkdirs();
-                    if (!created) {
-                        plugin.getLogger().warning("Failed to create menus folder");
-                    }
-                }
-
-                File[] menuFiles = menuFolder.listFiles((dir, name) -> 
-                    name.endsWith(".yml") || name.endsWith(".conf") || name.endsWith(".hocon"));
-
-                if (menuFiles != null) {
-                    for (File file : menuFiles) {
-                        try {
-                            loadMenu(file);
-                        } catch (MenuLoadException e) {
-                            plugin.getLogger().severe("Failed to load menu from file " + file.getName() + ": " + e.getMessage());
-                        }
-                    }
-                }
-                plugin.getLogger().info("Menus loaded successfully.");
+    public void loadMenus() throws MenuLoadException {
+        // 标记所有现有菜单为过期
+        menus.values().forEach(Menu::markAsExpired);
+        
+        menus.clear();
+        menuCache.clear(); // 添加这一行
+        Path menuFolder = plugin.getDataFolder().toPath().resolve("menus");
+        if (!Files.exists(menuFolder)) {
+            try {
+                Files.createDirectories(menuFolder);
+            } catch (IOException e) {
+                throw new MenuLoadException("Failed to create menus directory", e);
             }
-        }.runTaskAsynchronously(plugin);
+        }
+
+        try (Stream<Path> paths = Files.list(menuFolder)) {
+            paths.filter(path -> path.toString().endsWith(".yml"))
+                 .forEach(this::loadMenuFile);
+
+            if (menus.isEmpty()) {
+                throw new MenuLoadException("No menus were successfully loaded");
+            }
+
+            // 修改这一行
+            Logger.info("Menus loaded successfully. Total menus: " + menus.size());
+        } catch (IOException e) {
+            throw new MenuLoadException("Error accessing menu files", e);
+        }
     }
 
     /**
      * Loads a single menu from a configuration file.
      *
-     * @param file The configuration file to load the menu from.
+     * @param file The path to the menu configuration file.
      */
-    private void loadMenu(File file) throws MenuLoadException {
-        String fileName = file.getName();
-        String menuName = fileName.substring(0, fileName.lastIndexOf('.'));
-
+    private void loadMenuFile(Path file) {
+        String fileName = file.getFileName().toString();
+        String menuName = getMenuName(fileName);
         try {
-            ConfigurationSection config;
-            if (fileName.endsWith(".yml")) {
-                config = YamlConfiguration.loadConfiguration(file);
-            } else if (fileName.endsWith(".conf") || fileName.endsWith(".hocon")) {
-                config = new ConfigAdapter(file);
-            } else {
-                throw new MenuLoadException("Unsupported menu file format: " + fileName);
-            }
-
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(file.toFile());
             Menu menu = new Menu(menuName, config);
-            menus.put(menuName, menu);
-            plugin.getLogger().info("Successfully loaded menu: " + menuName);
-        } catch (Exception e) {
-            throw new MenuLoadException("Error loading menu " + menuName, e);
+            registerMenu(menu);
+            Logger.debug("Loaded menu: " + menuName + " with " + menu.getItemCount() + " items");
+            Logger.debug("Menu title: " + menu.getTitle()); // 添加这行来查看标题是否更新
+            Logger.info("Successfully loaded menu: " + menuName);
+        } catch (MenuLoadException e) {
+            Logger.error("Failed to load menu from file " + fileName + ": " + e.getMessage());
         }
+    }
+
+    private String getMenuName(String fileName) {
+        return fileName.substring(0, fileName.lastIndexOf('.'));
     }
 
     /**
      * Retrieves a menu by its name.
      *
      * @param name The name of the menu to retrieve.
-     * @return The Menu instance, or null if not found.
+     * @return The Menu instance.
+     * @throws MenuNotFoundException if the menu is not found.
      */
-    public Menu getMenu(String name) {
-        return menus.get(name);
+    public Menu getMenu(String name) throws MenuNotFoundException {
+        lock.readLock().lock();
+        try {
+            Menu menu = menuCache.get(name);
+            if (menu == null) {
+                menu = menus.get(name);
+                if (menu == null) {
+                    throw new MenuNotFoundException("Menu not found: " + name);
+                }
+                menuCache.put(name, menu);
+            }
+            return menu;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Cleans the menu cache periodically.
+     * This method is called automatically by the scheduler.
+     */
+    private void cleanCache() {
+        menuCache.clear();
+        Logger.debug("Menu cache cleared");
     }
 
     /**
      * Retrieves all loaded menus.
      *
-     * @return A map of all loaded menus, with menu names as keys and Menu instances as values.
+     * @return An unmodifiable map of all loaded menus, with menu names as keys and Menu instances as values.
      */
     public Map<String, Menu> getAllMenus() {
-        return new ConcurrentHashMap<>(menus);
-    }
-
-    /**
-     * Retrieves a menu by its title.
-     *
-     * @param title The title of the menu to retrieve.
-     * @return The Menu instance, or null if not found.
-     */
-    public Menu getMenuByTitle(String title) {
-        return menus.values().stream()
-                .filter(menu -> menu.getTitle().equals(title))
-                .findFirst()
-                .orElse(null);
+        return Map.copyOf(menus);
     }
 
     /**
@@ -128,6 +146,43 @@ public class MenuManager {
      * @param menu The Menu instance to register.
      */
     public void registerMenu(Menu menu) {
-        menus.put(menu.getName(), menu);
+        lock.writeLock().lock();
+        try {
+            menus.put(menu.getName(), menu);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Retrieves a menu asynchronously by its name.
+     * This method is useful for loading menus without blocking the main thread.
+     *
+     * @param name The name of the menu to retrieve.
+     * @return A CompletableFuture that will complete with the Menu instance, or complete exceptionally with a MenuNotFoundException.
+     */
+    public CompletableFuture<Menu> getMenuAsync(String name) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return getMenu(name);
+            } catch (MenuNotFoundException e) {
+                throw new CompletionException(e);
+            }
+        });
+    }
+
+    /**
+     * Shuts down the MenuManager and its scheduler.
+     * This method should be called when the plugin is being disabled.
+     */
+    public void shutdown() {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

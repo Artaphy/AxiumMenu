@@ -8,15 +8,18 @@ command:
     list: "&d/axiummenu list &7- &fShow all available menus"
     serve: "&d/axiummenu serve &7- &fToggle auto-reload mode for menu files"
   error:
+    usage_open: "&cUsage: /axiummenu open <menu>"
     player_only: "&cOnly players can open menus!"
-    menu_not_found: "&cCannot find the specified menu: "
+    menu_not_found: "&cCannot find the specified menu: {menu}"
+    menu_open_failed: "&cAn error occurred while opening the menu. Please check the console for more information."
+    menu_reload_failed: "&cMenu reload failed. Please check the console for more information"
   success:
-    menu_opened: "&aOpened menu: %title%"
+    menu_opened: "&aOpened menu: {title}"
     config_reloaded: "&aAxiumMenu configuration has been reloaded!"
   list:
     title: "&6Available Menus:"
     empty: "&cNo menus available."
-    format: "&7- &e%name%&7: &f%title%"
+    format: "&7- &e{name}&7: &f{title}"
   serve:
     enabled: "&aMenu file auto-reload mode has been enabled"
     disabled: "&cMenu file auto-reload mode has been disabled"

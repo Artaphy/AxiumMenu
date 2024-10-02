@@ -1,19 +1,24 @@
 package me.artaphy.axiumMenu.utils;
 
-import java.awt.Color;
+import net.md_5.bungee.api.ChatColor;
+
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
-import net.md_5.bungee.api.ChatColor;
-
-
+/**
+ * Utility class for handling color-related operations in AxiumMenu.
+ */
 public class ColorUtils {
    private static final Pattern HEX_PATTERN = Pattern.compile("<#([A-Fa-f0-9]{6})>");
    private static final Pattern GRADIENT_PATTERN = Pattern.compile("<(?:gradient|g)(?:#\\d+)?(?::#([A-Fa-f\\d]{6}|[A-Fa-f\\d]{3})){2,}(?::(?:l|L|loop))?>");
    private static final Pattern RAINBOW_PATTERN = Pattern.compile("<(?:rainbow|r)(?:#\\d+)?(?::\\d*\\.?\\d+)?(?::\\d*\\.?\\d+)?(?::(?:l|L|loop))?>");
    private static final Pattern FORMAT_PATTERN = Pattern.compile("<([a-zA-Z]+)>");
+   private static final Map<String, String> colorCache = new ConcurrentHashMap<>();
 
    /**
     * Applies color codes and formatting to a message.
@@ -22,6 +27,10 @@ public class ColorUtils {
     * @return The colorized message
     */
    public static String colorize(String message) {
+       return colorCache.computeIfAbsent(message, ColorUtils::colorizeUncached);
+   }
+
+   private static String colorizeUncached(String message) {
        if (message == null) return null;
        
        message = ChatColor.translateAlternateColorCodes('&', message);

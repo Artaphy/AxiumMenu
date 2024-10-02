@@ -1,20 +1,29 @@
 package me.artaphy.axiumMenu.commands;
 
 import me.artaphy.axiumMenu.AxiumMenu;
+import me.artaphy.axiumMenu.exceptions.MenuLoadException;
 import me.artaphy.axiumMenu.menu.Menu;
+import me.artaphy.axiumMenu.utils.ColorUtils;
+import me.artaphy.axiumMenu.utils.Logger;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Handles the main command execution for the AxiumMenu plugin.
  * This class is responsible for processing all subcommands of the plugin.
  */
-public class MainCommand implements CommandExecutor {
+public class MainCommand implements CommandExecutor, TabCompleter {
 
     private final AxiumMenu plugin;
 
@@ -44,25 +53,17 @@ public class MainCommand implements CommandExecutor {
         }
 
         switch (args[0].toLowerCase()) {
-            case "open":
+            case "open" -> {
                 if (args.length < 2) {
                     sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.usage_open"));
                     return true;
                 }
                 openMenu(sender, args[1]);
-                break;
-            case "reload":
-                reloadPlugin(sender);
-                break;
-            case "list":
-                listMenus(sender);
-                break;
-            case "serve":
-                toggleServeMode(sender);
-                break;
-            default:
-                sendHelp(sender);
-                break;
+            }
+            case "reload" -> reloadPlugin(sender);
+            case "list" -> listMenus(sender);
+            case "serve" -> toggleServeMode(sender);
+            default -> sendHelp(sender);
         }
 
         return true;
@@ -88,19 +89,37 @@ public class MainCommand implements CommandExecutor {
      * @param menuName The name of the menu to open.
      */
     private void openMenu(CommandSender sender, String menuName) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.player_only"));
             return;
         }
 
-        Menu menu = plugin.getMenuManager().getMenu(menuName);
-        if (menu == null) {
-            sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.menu_not_found").replace("%menu%", menuName));
-            return;
+        if (plugin.getConfigManager().isDebugMode()) {
+            Logger.debug("Attempting to open menu '" + menuName + "' for player " + player.getName());
         }
 
-        menu.open((Player) sender);
-        sender.sendMessage(plugin.getConfigManager().getLanguageString("command.success.menu_opened").replace("%title%", menu.getTitle()));
+        plugin.getMenuManager().getMenuAsync(menuName)
+            .thenAccept(menu -> Bukkit.getScheduler().runTask(plugin, () -> {
+                try {
+                    menu.open(player);
+                    sender.sendMessage(plugin.getConfigManager().getLanguageString("command.success.menu_opened")
+                        .replace("{title}", ColorUtils.colorize(menu.getTitle())));
+                    if (plugin.getConfigManager().isDebugMode()) {
+                        Logger.debug("Successfully opened menu '" + menuName + "' for player " + player.getName());
+                    }
+                } catch (Exception e) {
+                    sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.menu_open_failed"));
+                    Logger.error("Error opening menu: " + menuName, e);
+                }
+            }))
+            .exceptionally(e -> {
+                sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.menu_not_found")
+                    .replace("%menu%", menuName));
+                if (plugin.getConfigManager().isDebugMode()) {
+                    Logger.debug("Failed to find menu '" + menuName + "' for player " + player.getName());
+                }
+                return null;
+            });
     }
 
     /**
@@ -110,8 +129,13 @@ public class MainCommand implements CommandExecutor {
      */
     private void reloadPlugin(CommandSender sender) {
         plugin.getConfigManager().loadConfigs();
-        plugin.getMenuManager().loadMenus();
-        sender.sendMessage(plugin.getConfigManager().getLanguageString("command.success.config_reloaded"));
+        try {
+            plugin.getMenuManager().loadMenus();
+            sender.sendMessage(plugin.getConfigManager().getLanguageString("command.success.config_reloaded"));
+        } catch (MenuLoadException e) {
+            sender.sendMessage(plugin.getConfigManager().getLanguageString("command.error.menu_reload_failed"));
+            Logger.error("Failed to reload menus", e);
+        }
     }
 
     /**
@@ -121,23 +145,15 @@ public class MainCommand implements CommandExecutor {
      */
     private void listMenus(CommandSender sender) {
         Map<String, Menu> menus = plugin.getMenuManager().getAllMenus();
-        plugin.getLogger().info("Attempting to get language string for 'command.list.title'");
-        String title = plugin.getConfigManager().getLanguageString("command.list.title");
-        plugin.getLogger().info("Retrieved title: " + title);
-        sender.sendMessage(title);
+        sender.sendMessage(plugin.getConfigManager().getLanguageString("command.list.title"));
         
         if (menus.isEmpty()) {
-            plugin.getLogger().info("Attempting to get language string for 'command.list.empty'");
-            String emptyMessage = plugin.getConfigManager().getLanguageString("command.list.empty");
-            plugin.getLogger().info("Retrieved empty message: " + emptyMessage);
-            sender.sendMessage(emptyMessage);
+            sender.sendMessage(plugin.getConfigManager().getLanguageString("command.list.empty"));
         } else {
             for (Menu menu : menus.values()) {
-                plugin.getLogger().info("Attempting to get language string for 'command.list.format'");
-                String format = plugin.getConfigManager().getLanguageString("command.list.format");
-                plugin.getLogger().info("Retrieved format: " + format);
-                String message = format.replace("%name%", menu.getName())
-                                       .replace("%title%", menu.getTitle());
+                String message = plugin.getConfigManager().getLanguageString("command.list.format")
+                                       .replace("{name}", menu.getName())
+                                       .replace("{title}", ColorUtils.colorize(menu.getTitle()));
                 sender.sendMessage(message);
             }
         }
@@ -154,5 +170,27 @@ public class MainCommand implements CommandExecutor {
             plugin.getConfigManager().getLanguageString("command.serve.enabled") :
             plugin.getConfigManager().getLanguageString("command.serve.disabled");
         sender.sendMessage(message);
+
+        // 如果启用了serve模式,启动文件监听器;如果禁用了,停止文件监听器
+        if (newState) {
+            plugin.startFileWatcher();
+        } else {
+            plugin.stopFileWatcher();
+        }
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
+        List<String> subCommands = Arrays.asList("open", "reload", "list", "serve");
+        if (args.length == 1) {
+            return subCommands.stream()
+                    .filter(sc -> sc.startsWith(args[0].toLowerCase()))
+                    .collect(Collectors.toList());
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("open")) {
+            return plugin.getMenuManager().getAllMenus().keySet().stream()
+                    .filter(menu -> menu.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 }

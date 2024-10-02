@@ -1,18 +1,24 @@
 package me.artaphy.axiumMenu;
 
-import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.JavaPlugin;
 import me.artaphy.axiumMenu.commands.MainCommand;
 import me.artaphy.axiumMenu.config.ConfigManager;
 import me.artaphy.axiumMenu.events.MenuReloadEvent;
-import me.artaphy.axiumMenu.menu.MenuManager;
+import me.artaphy.axiumMenu.exceptions.MenuLoadException;
+import me.artaphy.axiumMenu.exceptions.MenuNotFoundException;
 import me.artaphy.axiumMenu.listeners.MenuListener;
-import me.artaphy.axiumMenu.menu.Menu;  // 添加这行导入语句
+import me.artaphy.axiumMenu.menu.Menu;
+import me.artaphy.axiumMenu.menu.MenuInventoryHolder;
+import me.artaphy.axiumMenu.menu.MenuManager;
+import me.artaphy.axiumMenu.utils.Logger;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import me.clip.placeholderapi.PlaceholderAPI;
 
-import java.util.Objects;
 import java.io.File;
-import java.nio.file.*;
 import java.io.IOException;
+import java.nio.file.*;
+import java.util.Objects;
 
 /**
  * Main class for the AxiumMenu plugin.
@@ -24,9 +30,13 @@ public final class AxiumMenu extends JavaPlugin {
     private MenuManager menuManager;
     private WatchService watchService;
     private Thread watchThread;
+    private static AxiumMenu instance;
+    private static boolean placeholderAPIEnabled = false;
 
     @Override
     public void onEnable() {
+        Logger.init(this);
+        instance = this;
         // Initialize configuration manager
         configManager = new ConfigManager(this);
         configManager.loadConfigs();
@@ -40,24 +50,46 @@ public final class AxiumMenu extends JavaPlugin {
             createExampleMenus();
         }
         
-        menuManager.loadMenus();
+        // Load menus
+        try {
+            menuManager.loadMenus();
+        } catch (MenuLoadException e) {
+            Logger.error("Failed to load menus: " + e.getMessage(), e);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
         
         // Register main command
-        Objects.requireNonNull(getCommand("axiummenu")).setExecutor(new MainCommand(this));
+        MainCommand mainCommand = new MainCommand(this);
+        Objects.requireNonNull(getCommand("axiummenu")).setExecutor(mainCommand);
+        Objects.requireNonNull(getCommand("axiummenu")).setTabCompleter(mainCommand);
         
         // Register menu listener
         getServer().getPluginManager().registerEvents(new MenuListener(this), this);
         
-        getLogger().info("AxiumMenu plugin has been enabled!");
+        Logger.info("AxiumMenu plugin has been enabled successfully!");
         
         // Start file watcher if serve mode is enabled
-        startFileWatcher();
+        if (configManager.isServeMode()) {
+            startFileWatcher();
+        }
+        
+        if (configManager.isDebugMode()) {
+            Logger.debug("AxiumMenu plugin is starting in debug mode");
+            Logger.debug("Plugin data folder: " + getDataFolder().getAbsolutePath());
+        }
+        
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            placeholderAPIEnabled = true;
+            Logger.info("PlaceholderAPI found and hooked successfully!");
+        }
     }
 
     @Override
     public void onDisable() {
+        menuManager.shutdown();
         stopFileWatcher();
-        getLogger().info("AxiumMenu plugin has been disabled!");
+        Logger.info("AxiumMenu plugin has been disabled.");
     }
 
     /**
@@ -69,15 +101,13 @@ public final class AxiumMenu extends JavaPlugin {
         if (!menuFolder.exists()) {
             boolean created = menuFolder.mkdirs();
             if (!created) {
-                getLogger().warning("Failed to create menus folder");
+                Logger.warn("Failed to create menus folder");
             }
         }
 
         saveResource("menus/example.yml", false);
-        saveResource("menus/example2.conf", false);
-        saveResource("menus/example3.hocon", false);
         
-        getLogger().info("Example menus created in the menus folder");
+        Logger.info("Example menu created in the menus folder");
     }
 
     /**
@@ -97,64 +127,45 @@ public final class AxiumMenu extends JavaPlugin {
     }
 
     /**
-     * Creates a new menu dynamically.
-     * @param name The name of the menu.
-     * @param title The title of the menu.
-     * @param rows The number of rows in the menu.
-     * @return The newly created Menu instance.
-     */
-    @SuppressWarnings("unused")
-    public Menu createMenu(String name, String title, int rows) {
-        Menu menu = new Menu(name, title, rows);
-        menuManager.registerMenu(menu);
-        return menu;
-    }
-
-    /**
-     * Registers a custom menu with the menu manager.
-     * @param menu The Menu instance to register.
-     */
-    @SuppressWarnings("unused")
-    public void registerMenu(Menu menu) {
-        menuManager.registerMenu(menu);
-    }
-
-    /**
      * Starts the file watcher service if serve mode is enabled.
      * This allows for automatic reloading of menu files when changes are detected.
      */
-    private void startFileWatcher() {
-        if (configManager.isServeMode()) {
-            try {
-                watchService = FileSystems.getDefault().newWatchService();
-                Path menuFolder = new File(getDataFolder(), "menus").toPath();
-                menuFolder.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
-                
-                watchThread = new Thread(this::watchForChanges);
-                watchThread.start();
-                
-                getLogger().info("Menu file watcher has been started");
-            } catch (IOException e) {
-                getLogger().severe("Unable to start menu file watcher: " + e.getMessage());
-            }
+    public void startFileWatcher() {
+        if (watchThread != null && watchThread.isAlive()) {
+            return;
+        }
+        try {
+            watchService = FileSystems.getDefault().newWatchService();
+            Path menuFolder = new File(getDataFolder(), "menus").toPath();
+            menuFolder.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+            
+            watchThread = new Thread(this::watchForChanges);
+            watchThread.start();
+            
+            Logger.info("Menu file watcher has been started");
+        } catch (IOException e) {
+            Logger.error("Unable to start menu file watcher: " + e.getMessage(), e);
         }
     }
 
     /**
      * Stops the file watcher service.
-     * This method is called when the plugin is being disabled.
+     * This method is called when the plugin is being disabled or when serve mode is turned off.
      */
-    private void stopFileWatcher() {
+    public void stopFileWatcher() {
         if (watchThread != null) {
             watchThread.interrupt();
+            watchThread = null;
         }
         if (watchService != null) {
             try {
                 watchService.close();
+                watchService = null;
             } catch (IOException e) {
-                getLogger().severe("Error closing file watch service: " + e.getMessage());
+                Logger.error("Error closing file watch service: " + e.getMessage(), e);
             }
         }
+        Logger.info("Menu file watcher has been stopped");
     }
 
     /**
@@ -167,14 +178,54 @@ public final class AxiumMenu extends JavaPlugin {
                 WatchKey key = watchService.take();
                 for (WatchEvent<?> event : key.pollEvents()) {
                     if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) {
-                        getLogger().info("Menu file change detected, reloading menus...");
-                        Bukkit.getPluginManager().callEvent(new MenuReloadEvent());
+                        if (configManager.isDebugMode()) {
+                            Logger.debug("File change detected: " + event.context());
+                        }
+                        Logger.info("Menu file change detected, reloading menus...");
+                        
+                        Bukkit.getScheduler().runTaskAsynchronously(this, () -> Bukkit.getPluginManager().callEvent(new MenuReloadEvent()));
+                        
+                        Bukkit.getScheduler().runTask(this, () -> {
+                            try {
+                                menuManager.loadMenus();
+                                Bukkit.getOnlinePlayers().forEach(player -> {
+                                    if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuInventoryHolder menuHolder) {
+                                        Menu currentMenu = menuHolder.getMenu();
+                                        if (currentMenu.isExpired()) {
+                                            String menuName = currentMenu.getName();
+                                            player.closeInventory();
+                                            try {
+                                                Menu updatedMenu = menuManager.getMenu(menuName);
+                                                updatedMenu.open(player);
+                                            } catch (MenuNotFoundException e) {
+                                                Logger.warn("Menu " + menuName + " no longer exists after reload.");
+                                            }
+                                        }
+                                    }
+                                });
+                            } catch (MenuLoadException e) {
+                                Logger.error("Failed to reload menus: " + e.getMessage(), e);
+                            }
+                        });
                     }
                 }
                 key.reset();
             }
         } catch (InterruptedException e) {
             // Thread interrupted, exiting normally
+            Thread.currentThread().interrupt();
         }
+    }
+
+    public static AxiumMenu getInstance() {
+        return instance;
+    }
+
+    @SuppressWarnings("unused")
+    public static String setPlaceholders(Player player, String text) {
+        if (placeholderAPIEnabled) {
+            return PlaceholderAPI.setPlaceholders(player, text);
+        }
+        return text;
     }
 }

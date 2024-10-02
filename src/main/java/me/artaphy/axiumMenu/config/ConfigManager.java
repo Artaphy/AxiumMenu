@@ -1,22 +1,20 @@
 package me.artaphy.axiumMenu.config;
 
+import me.artaphy.axiumMenu.AxiumMenu;
+import me.artaphy.axiumMenu.exceptions.ConfigurationException;
+import me.artaphy.axiumMenu.utils.ColorUtils;
+import me.artaphy.axiumMenu.utils.Logger;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-
-import me.artaphy.axiumMenu.AxiumMenu;
-import me.artaphy.axiumMenu.utils.ColorUtils;
-
 import java.io.File;
 import java.io.IOException;
-import me.artaphy.axiumMenu.exceptions.ConfigurationException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages the configuration files for the AxiumMenu plugin.
@@ -28,10 +26,10 @@ public class ConfigManager {
     private FileConfiguration settingsConfig;
     private File settingsFile;
     private final Map<String, FileConfiguration> languageConfigs;
-    private final File dataFolder;
     private String defaultLanguage;
     private boolean serveMode;
-    private final Cache<String, String> languageCache;
+    private boolean debugMode;
+    private final Map<String, String> languageCache;
 
     /**
      * Constructs a new ConfigManager instance.
@@ -41,26 +39,28 @@ public class ConfigManager {
     public ConfigManager(AxiumMenu plugin) {
         this.plugin = plugin;
         this.languageConfigs = new HashMap<>();
-        this.dataFolder = new File(plugin.getDataFolder(), "data");
-        this.languageCache = CacheBuilder.newBuilder()
-            .maximumSize(1000)
-            .expireAfterWrite(5, TimeUnit.MINUTES)
-            .build();
+        this.languageCache = new ConcurrentHashMap<>();
     }
 
     /**
      * Loads all configuration files.
-     * This includes settings, language files, and initializes the data folder.
+     * This includes settings and language files.
      */
     public void loadConfigs() {
         try {
             loadSettingsConfig();
             loadLanguageConfigs();
-            createDataFolder();
+            validateConfig();
             this.serveMode = settingsConfig.getBoolean("serve_mode", false);
-            plugin.getLogger().info(getLanguageString("config.loaded"));
+            this.debugMode = settingsConfig.getBoolean("debug", false);
+            if (debugMode) {
+                Logger.debug("Debug mode enabled");
+                Logger.debug("Serve mode: " + serveMode);
+                Logger.debug("Default language: " + defaultLanguage);
+            }
+            Logger.info(getLanguageString("config.loaded"));
         } catch (ConfigurationException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to save settings.yml!", e);
+            Logger.error("Failed to load configurations!", e);
         }
     }
 
@@ -74,11 +74,13 @@ public class ConfigManager {
         }
         try {
             settingsConfig = YamlConfiguration.loadConfiguration(settingsFile);
+            Logger.info("Settings config loaded successfully");
         } catch (Exception e) {
+            Logger.error("Failed to load settings.yml", e);
             throw new ConfigurationException("Failed to load settings.yml", e);
         }
         
-        validateConfig();
+        // Removed validateConfig() call here
     }
 
     /**
@@ -86,40 +88,43 @@ public class ConfigManager {
      */
     private void loadLanguageConfigs() {
         File langFolder = new File(plugin.getDataFolder(), "lang");
-        if (!langFolder.exists()) {
-            boolean created = langFolder.mkdirs();
-            if (!created) {
-                plugin.getLogger().warning("Failed to create menus folder");
-            }
+        if (!langFolder.exists() && !langFolder.mkdirs()) {
+            Logger.warn("Failed to create language folder");
+            return;
         }
 
-        plugin.getLogger().info("Language folder path: " + langFolder.getAbsolutePath());
-        plugin.getLogger().info("Language folder exists: " + langFolder.exists());
+        Logger.info("Language folder path: " + langFolder.getAbsolutePath());
 
-        // Save default language files
         saveDefaultLanguageFile("en_US.yml");
         saveDefaultLanguageFile("zh_CN.yml");
 
         File[] langFiles = langFolder.listFiles((dir, name) -> name.endsWith(".yml"));
         if (langFiles != null) {
-            plugin.getLogger().info("Found " + langFiles.length + " language files");
             for (File file : langFiles) {
                 String langCode = file.getName().replace(".yml", "");
                 languageConfigs.put(langCode, YamlConfiguration.loadConfiguration(file));
-                plugin.getLogger().info("Loaded language file: " + file.getName());
             }
+            Logger.info("Loaded " + languageConfigs.size() + " language files");
         } else {
-            plugin.getLogger().warning("No language files found in the lang folder");
+            Logger.warn("No language files found in the lang folder");
         }
 
         defaultLanguage = settingsConfig.getString("language", "en_US");
         if (!languageConfigs.containsKey(defaultLanguage)) {
-            plugin.getLogger().warning("Default language " + defaultLanguage + " not found, using en_US as fallback");
+            Logger.warn("Default language " + defaultLanguage + " not found, using en_US as fallback");
             defaultLanguage = "en_US";
         }
 
-        for (Map.Entry<String, FileConfiguration> entry : languageConfigs.entrySet()) {
-            plugin.getLogger().info("Loaded language: " + entry.getKey() + " with " + entry.getValue().getKeys(true).size() + " keys");
+        if (languageConfigs.isEmpty()) {
+            Logger.error("No language files could be loaded. Creating default en_US.yml");
+            createDefaultLanguageFile("en_US.yml");
+            languageConfigs.put("en_US", YamlConfiguration.loadConfiguration(new File(langFolder, "en_US.yml")));
+            defaultLanguage = "en_US";
+        }
+
+        if (debugMode) {
+            languageConfigs.forEach((key, value) -> 
+                Logger.debug("Loaded language: " + key + " with " + value.getKeys(true).size() + " keys"));
         }
     }
 
@@ -133,37 +138,40 @@ public class ConfigManager {
         if (!langFile.exists()) {
             try (InputStream in = plugin.getResource("lang/" + fileName)) {
                 if (in != null) {
-                    plugin.saveResource("lang/" + fileName, false);
+                    Files.copy(in, langFile.toPath());
+                    Logger.info("Created language file: " + fileName);
                 } else {
-                    plugin.getLogger().warning("Missing language file: " + fileName);
+                    Logger.warn("Default language file not found in jar: " + fileName);
+                    createDefaultLanguageFile(fileName);
                 }
             } catch (IOException e) {
-                plugin.getLogger().severe("Error while saving language file: " + fileName);
-                plugin.getLogger().log(Level.SEVERE, "Failed to save language file: " + fileName + "!", e);
+                Logger.error("Failed to save language file: " + fileName + "! Creating a default one.", e);
+                createDefaultLanguageFile(fileName);
             }
         }
     }
 
     /**
-     * Creates the data folder if it doesn't exist.
-     */
-    private void createDataFolder() {
-        if (!dataFolder.exists()) {
-            boolean created = dataFolder.mkdirs();
-            if (!created) {
-                plugin.getLogger().warning("Failed to create menus folder");
-            }
-        }
-    }
-
-    /**
-     * Gets the settings configuration.
+     * Creates a default language file with basic entries.
      *
-     * @return The FileConfiguration for the settings.
+     * @param fileName The name of the language file to create.
      */
-    @SuppressWarnings("unused")
-    public FileConfiguration getSettingsConfig() {
-        return settingsConfig;
+    private void createDefaultLanguageFile(String fileName) {
+        File langFile = new File(plugin.getDataFolder(), "lang/" + fileName);
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("config.loaded", "Configuration loaded successfully.");
+        config.set("command.error.usage_open", "Usage: /axiummenu open <menu>");
+        config.set("command.error.player_only", "This command can only be used by players.");
+        config.set("command.error.menu_not_found", "Menu not found: %menu%");
+        config.set("command.success.menu_opened", "Opened menu: %title%");
+        // Add more default language strings here
+
+        try {
+            config.save(langFile);
+            Logger.info("Created default language file: " + fileName);
+        } catch (IOException e) {
+            Logger.error("Failed to create default language file: " + fileName + "!", e);
+        }
     }
 
     /**
@@ -173,7 +181,7 @@ public class ConfigManager {
         try {
             settingsConfig.save(settingsFile);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to save settings.yml!", e);
+            Logger.error("Failed to save settings.yml!", e);
         }
     }
 
@@ -188,34 +196,17 @@ public class ConfigManager {
     }
 
     /**
-     * Gets the data folder for the plugin.
-     *
-     * @return The File object representing the data folder.
-     */
-    @SuppressWarnings("unused")
-    public File getDataFolder() {
-        return dataFolder;
-    }
-
-    /**
      * Gets a language string for the default language.
      *
      * @param key The key of the language string.
      * @return The language string, colorized.
      */
     public String getLanguageString(String key) {
-        String cachedValue = languageCache.getIfPresent(key);
-        if (cachedValue != null) {
-            return cachedValue;
-        }
-        FileConfiguration langConfig = getLanguageConfig(defaultLanguage);
-        String value = langConfig.getString(key);
-
-        if (value == null) value = key;
-
-        value = ColorUtils.colorize(value);
-        languageCache.put(key, value);
-        return value;
+        return languageCache.computeIfAbsent(key, k -> {
+            FileConfiguration langConfig = getLanguageConfig(defaultLanguage);
+            String value = langConfig.getString(k, k);
+            return ColorUtils.colorize(value);
+        });
     }
 
     /**
@@ -230,20 +221,40 @@ public class ConfigManager {
         validateSetting("database.mysql.username", "root");
         validateSetting("database.mysql.password", "password");
         validateSetting("serve_mode", false);
+        validateSetting("debug", false);
         validateSetting("version", 1);
-    
-        // Save any changes made during validation
-        try {
-            settingsConfig.save(settingsFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Failed to save settings after validation: " + e.getMessage());
-            throw new ConfigurationException("Failed to save settings after validation", e);
+
+        String language = settingsConfig.getString("language", "en_US");
+        if (!languageConfigs.containsKey(language)) {
+            Logger.warn("Language file for " + language + " not found. Using en_US as fallback.");
+            settingsConfig.set("language", "en_US");
+            saveSettingsConfig();
+        }
+
+        String dbType = settingsConfig.getString("database.type");
+        if (!Objects.equals(dbType, "sqlite") && !Objects.equals(dbType, "mysql")) {
+            throw new ConfigurationException("Invalid database type: " + dbType);
+        }
+
+        if (Objects.equals(dbType, "mysql")) {
+            validateMySQLSettings();
+        }
+
+        saveSettingsConfig();
+    }
+
+    private void validateMySQLSettings() throws ConfigurationException {
+        String[] requiredSettings = {"host", "port", "database", "username", "password"};
+        for (String setting : requiredSettings) {
+            if (!settingsConfig.isSet("database.mysql." + setting)) {
+                throw new ConfigurationException("Missing required MySQL setting: " + setting);
+            }
         }
     }
 
     private void validateSetting(String path, Object defaultValue) {
         if (!settingsConfig.isSet(path)) {
-            plugin.getLogger().warning("Missing '" + path + "' setting in config. Using default: " + defaultValue);
+            Logger.warn("Missing '" + path + "' setting in config. Using default: " + defaultValue);
             settingsConfig.set(path, defaultValue);
         }
     }
@@ -266,6 +277,16 @@ public class ConfigManager {
      * @return true if serve mode is enabled, false otherwise.
      */
     public boolean isServeMode() {
-        return serveMode;
+        // 每次检查时都从配置文件读取最新的值
+        return settingsConfig.getBoolean("serve_mode", false);
+    }
+
+    /**
+     * Checks if debug mode is enabled.
+     *
+     * @return true if debug mode is enabled, false otherwise.
+     */
+    public boolean isDebugMode() {
+        return debugMode;
     }
 }

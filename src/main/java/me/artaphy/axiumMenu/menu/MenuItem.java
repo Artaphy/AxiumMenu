@@ -1,12 +1,15 @@
 package me.artaphy.axiumMenu.menu;
 
+import me.artaphy.axiumMenu.utils.ColorUtils;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import me.artaphy.axiumMenu.utils.ColorUtils;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -24,26 +27,63 @@ public class MenuItem {
      * @param config The configuration section containing item details.
      */
     public MenuItem(ConfigurationSection config) {
-        Material material = Material.valueOf(config.getString("material", "STONE").toUpperCase());
-        int amount = config.getInt("amount", 1);
+        this(config.getValues(false));
+    }
+
+    /**
+     * Constructs a new MenuItem instance from a map of configuration values.
+     *
+     * @param config The map containing item configuration details.
+     */
+    public MenuItem(Map<String, Object> config) {
+        // Parse material
+        String materialName = Optional.ofNullable(config.get("material"))
+                .map(Object::toString)
+                .map(s -> s.replace("\"", ""))
+                .orElse("STONE");
+        Material material = Material.matchMaterial(materialName);
+        if (material == null) {
+            Bukkit.getLogger().warning("Invalid material: " + materialName + ". Using STONE instead.");
+            material = Material.STONE;
+        }
+
+        // Parse amount
+        int amount = Optional.ofNullable(config.get("amount"))
+                .map(Object::toString)
+                .map(Integer::parseInt)
+                .orElse(1);
+
+        // Create ItemStack
         this.itemStack = new ItemStack(material, amount);
 
+        // Set item meta
         ItemMeta meta = itemStack.getItemMeta();
         if (meta != null) {
-            String displayName = config.getString("name");
-            if (displayName != null) {
-                meta.setDisplayName(ColorUtils.colorize(displayName));
-            }
+            // Set display name
+            Optional.ofNullable(config.get("name"))
+                    .map(Object::toString)
+                    .map(s -> s.replace("\"", ""))
+                    .ifPresent(displayName -> meta.setDisplayName(ColorUtils.colorize(displayName)));
 
-            List<String> lore = config.getStringList("lore");
-            if (!lore.isEmpty()) {
-                meta.setLore(lore.stream().map(ColorUtils::colorize).collect(Collectors.toList()));
+            // Set lore
+            @SuppressWarnings("unchecked")
+            List<String> lore = (List<String>) config.get("lore");
+            if (lore != null && !lore.isEmpty()) {
+                List<String> colorizedLore = lore.stream()
+                        .map(s -> s.replace("\"", ""))
+                        .map(ColorUtils::colorize)
+                        .collect(Collectors.toList());
+                meta.setLore(colorizedLore);
             }
 
             itemStack.setItemMeta(meta);
         }
 
-        this.action = config.getString("action", "");
+        // Set action
+        this.action = Optional.ofNullable(config.get("action"))
+                .map(Object::toString)
+                .map(s -> s.replace("\"", ""))
+                .orElse("");
     }
 
     /**

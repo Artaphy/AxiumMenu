@@ -24,3 +24,6 @@ serve_mode: false
 
 # Configuration version (do not change manually)
 version: 1
+
+# Debug mode
+debug: false

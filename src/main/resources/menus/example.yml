@@ -1,3 +1,28 @@
-menu:
-  title: "<#114514>Hello AxiumMenu!"
-  rows: 6
+title: "<#114514>Hello AxiumMenu!"
+rows: 5
+type: CHEST
+
+layout: |-
+  #########
+  |       |
+  |   *   |
+  |       |
+  #########
+
+items:
+  '#':
+    material: gray stained glass pane
+    name: '&r'
+  '|':
+    material: cyan stained glass pane
+    name: '&r'
+  '*':
+    material: beacon
+    name: '&cCLICK TP TO SPAWN'
+    lore:
+      - ' '
+      - '&aClick to teleport!'
+  'close':
+    material: barrier
+    name: '&cCLOSE'
+    slot: 40
