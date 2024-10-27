@@ -3,8 +3,6 @@ package me.artaphy.axiumMenu.listeners;
 import me.artaphy.axiumMenu.AxiumMenu;
 import me.artaphy.axiumMenu.menu.Menu;
 import me.artaphy.axiumMenu.menu.MenuInventoryHolder;
-import me.artaphy.axiumMenu.menu.MenuItem;
-import me.artaphy.axiumMenu.exceptions.MenuNotFoundException;
 import me.artaphy.axiumMenu.menu.MenuActivator;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,9 +19,19 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import me.artaphy.axiumMenu.utils.Logger;
 
+import java.util.Objects;
+
 /**
- * Handles inventory-related events for AxiumMenu.
- * This class is responsible for managing menu interactions and closures.
+ * Handles all menu-related events in the plugin.
+ * This listener manages:
+ * - Menu interaction events (clicks, drags)
+ * - Menu opening and closing
+ * - Menu command execution
+ * - Chat triggers
+ * - Item triggers
+ * <p>
+ * Implements security measures to prevent unauthorized inventory manipulation
+ * and ensures proper event cancellation where necessary.
  */
 public class MenuListener implements Listener {
 
@@ -77,7 +85,7 @@ public class MenuListener implements Listener {
                     if (plugin.getConfigManager().isDebugMode()) {
                         Logger.debug("Player " + player.getName() + " clicked item in menu " + menu.getName() + " at slot " + slot);
                     }
-                    handleMenuItemClick(player, menuItem);
+                    menu.executeItemActions(player, menuItem);
                 });
             }
         }
@@ -118,54 +126,11 @@ public class MenuListener implements Listener {
      */
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getInventory().getHolder() instanceof MenuInventoryHolder) {
-            // Add any necessary logic for menu closure here
+        if (event.getInventory().getHolder() instanceof MenuInventoryHolder menuHolder) {
             Logger.debug("Menu closed by " + event.getPlayer().getName());
-        }
-    }
-
-    /**
-     * Processes the action associated with a clicked menu item.
-     *
-     * @param player   The player who clicked the item.
-     * @param menuItem The MenuItem that was clicked.
-     */
-    private void handleMenuItemClick(Player player, MenuItem menuItem) {
-        String action = menuItem.getAction();
-        if (action == null || action.isEmpty()) {
-            return;
-        }
-
-        String[] parts = action.split(":", 2);
-        String actionType = parts[0].toLowerCase();
-        String actionValue = parts.length > 1 ? parts[1] : "";
-
-        try {
-            switch (actionType) {
-                case "command" -> player.performCommand(actionValue);
-                case "message" -> player.sendMessage(actionValue);
-                case "open" -> openSubMenu(player, actionValue);
-                case "close" -> player.closeInventory();
-                default -> Logger.warn("Unknown action type: " + actionType);
+            if (event.getPlayer() instanceof Player player) {
+                menuHolder.getMenu().executeEvent("close", player);
             }
-        } catch (Exception e) {
-            Logger.error("Error handling menu item click", e);
-        }
-    }
-
-    /**
-     * Opens a sub-menu for the player.
-     *
-     * @param player   The player for whom to open the sub-menu.
-     * @param menuName The name of the sub-menu to open.
-     */
-    private void openSubMenu(Player player, String menuName) {
-        try {
-            Menu subMenu = plugin.getMenuManager().getMenu(menuName);
-            subMenu.open(player);
-        } catch (MenuNotFoundException e) {
-            Logger.warn("Attempted to open non-existent menu: " + menuName);
-            player.sendMessage("Sorry, that menu doesn't exist.");
         }
     }
 
@@ -220,12 +185,10 @@ public class MenuListener implements Listener {
         ItemMeta itemMeta = item.getItemMeta();
         ItemMeta triggerMeta = triggerItem.getItemMeta();
 
-        // If trigger item has no meta, consider it a match
         if (triggerMeta == null) {
             return true;
         }
 
-        // If trigger item has a name, check if it matches
         if (triggerMeta.hasDisplayName()) {
             if (itemMeta == null || !itemMeta.hasDisplayName() || 
                 !itemMeta.getDisplayName().equals(triggerMeta.getDisplayName())) {
@@ -233,12 +196,9 @@ public class MenuListener implements Listener {
             }
         }
 
-        // If trigger item has lore, check if it matches
         if (triggerMeta.hasLore()) {
-            if (itemMeta == null || !itemMeta.hasLore() || 
-                !itemMeta.getLore().equals(triggerMeta.getLore())) {
-                return false;
-            }
+            return itemMeta != null && itemMeta.hasLore() &&
+                    Objects.requireNonNull(itemMeta.getLore()).equals(triggerMeta.getLore());
         }
 
         return true;

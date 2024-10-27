@@ -1,0 +1,74 @@
+title: "&6Advanced Test Menu"
+type: CHEST
+
+layout:
+  - "####A####"
+  - "#B C D E#"
+  - "####F####"
+
+items:
+  '#':
+    material: GRAY_STAINED_GLASS_PANE
+    name: " "
+  'A':
+    material: NETHER_STAR
+    name: "&bWelcome"
+    lore:
+      - "&7Welcome to the advanced menu!"
+  'B':
+    material: DIAMOND
+    name: "&bVIP Reward"
+    lore:
+      - "&7Click to get a VIP reward"
+    actions:
+      - condition: "any [perm axiummenu.vip ; perm axiummenu.admin]"
+        actions:
+          - "command: give %player% diamond 64"
+          - "tell: &aYou received 64 diamonds as a VIP reward!"
+        deny: "tell: &cYou need VIP or Admin permissions to use this feature!"
+  'C':
+    material: GOLDEN_APPLE
+    name: "&eHealth and Food"
+    lore:
+      - "&7Click to restore health and hunger"
+    actions:
+      - condition: "all [check papi %player_health% < 20 ; check papi %player_food_level% < 20]"
+        actions:
+          - "command: effect give %player% saturation 10 10"
+          - "command: heal %player%"
+          - "tell: &aYour health and hunger have been restored!"
+        deny: "tell: &cYour health and hunger are already full!"
+  'D':
+    material: EXPERIENCE_BOTTLE
+    name: "&aLevel Up"
+    lore:
+      - "&7Click to gain experience"
+    actions:
+      - condition: "check papi %player_level% < 30"
+        actions:
+          - "command: xp add %player% 1000 points"
+          - "tell: &aYou gained experience!"
+        deny: "tell: &cYour level is already 30 or higher!"
+  'E':
+    material: ENDER_PEARL
+    name: "&5Random Teleport"
+    lore:
+      - "&7Click to teleport randomly"
+    actions:
+      - "command: rtp %player%"
+      - "tell: &aYou have been teleported to a random location!"
+  'F':
+    material: BARRIER
+    name: "&cClose Menu"
+    lore:
+      - "&7Click to close the menu"
+    actions:
+      - "close"
+
+events:
+  open:
+    - "sound: BLOCK_CHEST_OPEN-1-0"
+    - "title: `&6Welcome to Advanced Menu` `&eEnjoy your stay!` 10 40 10"
+  close:
+    - "sound: BLOCK_CHEST_CLOSE-1-0"
+    - "actionbar: &aThanks for visiting!"

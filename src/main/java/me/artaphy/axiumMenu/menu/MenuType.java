@@ -2,6 +2,16 @@ package me.artaphy.axiumMenu.menu;
 
 import org.bukkit.event.inventory.InventoryType;
 
+/**
+ * Enumeration of supported menu types in the AxiumMenu plugin.
+ * Maps custom menu types to Bukkit's InventoryType.
+ * <p>
+ * Features:
+ * - Support for all vanilla inventory types
+ * - Fallback to CHEST type for unrecognized values
+ * - Case-insensitive type matching
+ * - Flexible naming convention support
+ */
 public enum MenuType {
     CHEST(InventoryType.CHEST),
     DISPENSER(InventoryType.DISPENSER),

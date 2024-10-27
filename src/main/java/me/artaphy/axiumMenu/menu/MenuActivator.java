@@ -8,11 +8,21 @@ import org.bukkit.inventory.meta.ItemMeta;
 import me.artaphy.axiumMenu.utils.ColorUtils;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * Represents an activator for a menu in the AxiumMenu plugin.
- * Activators can be commands, chat messages, or items that trigger the opening of a menu.
+ * Represents a mechanism for activating (opening) a menu.
+ * Supports multiple activation methods:
+ * - Commands
+ * - Chat triggers (specific messages)
+ * - Item triggers (right-clicking specific items)
+ * <p>
+ * Features:
+ * - Multiple triggers per menu
+ * - Customizable item triggers with names and lore
+ * - Case-insensitive chat triggers
+ * - Permission-based command triggers
  */
 public class MenuActivator {
 
@@ -29,12 +39,12 @@ public class MenuActivator {
     public MenuActivator(ConfigurationSection config) {
         if (config.contains("command")) {
             this.type = ActivatorType.COMMAND;
-            this.commands = config.isList("command") ? config.getStringList("command") : List.of(config.getString("command"));
+            this.commands = config.isList("command") ? config.getStringList("command") : List.of(Objects.requireNonNull(config.getString("command")));
             this.chatTriggers = null;
             this.itemTrigger = null;
         } else if (config.contains("chat")) {
             this.type = ActivatorType.CHAT;
-            this.chatTriggers = config.isList("chat") ? config.getStringList("chat") : List.of(config.getString("chat"));
+            this.chatTriggers = config.isList("chat") ? config.getStringList("chat") : List.of(Objects.requireNonNull(config.getString("chat")));
             this.commands = null;
             this.itemTrigger = null;
         } else if (config.contains("item") || config.contains("material")) {
@@ -93,6 +103,7 @@ public class MenuActivator {
         Material material;
         if (config.contains("item")) {
             ConfigurationSection itemSection = config.getConfigurationSection("item");
+            assert itemSection != null;
             material = Material.matchMaterial(itemSection.getString("material", ""));
         } else {
             material = Material.matchMaterial(config.getString("material", ""));
@@ -117,11 +128,15 @@ public class MenuActivator {
     }
 
     /**
-     * Enum representing the types of activators available.
+     * Enum defining the available types of menu activators.
+     * Each type represents a different way to trigger menu opening.
      */
     public enum ActivatorType {
+        /** Activation via command */
         COMMAND,
+        /** Activation via chat message */
         CHAT,
+        /** Activation via item interaction */
         ITEM
     }
 }

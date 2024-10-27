@@ -1,0 +1,50 @@
+title: "&6Basic Test Menu"
+rows: 3
+type: CHEST
+
+layout:
+  - "#########"
+  - "#A B C D#"
+  - "#########"
+
+items:
+  '#':
+    material: BLACK_STAINED_GLASS_PANE
+    name: " "
+  'A':
+    material: DIAMOND
+    name: "&bDiamond"
+    lore:
+      - "&7Click to get a diamond"
+    actions:
+      - "command: give %player% diamond 1"
+      - "tell: &aYou received a diamond!"
+  'B':
+    material: GOLDEN_APPLE
+    name: "&eGolden Apple"
+    lore:
+      - "&7Click to heal"
+    actions:
+      - "command: heal %player%"
+      - "tell: &aYou have been healed!"
+  'C':
+    material: ENDER_PEARL
+    name: "&5Teleport"
+    lore:
+      - "&7Click to teleport to spawn"
+    actions:
+      - "command: spawn %player%"
+      - "tell: &aYou have been teleported to spawn!"
+  'D':
+    material: BARRIER
+    name: "&cClose"
+    lore:
+      - "&7Click to close the menu"
+    actions:
+      - "close"
+
+events:
+  open:
+    - "sound: BLOCK_CHEST_OPEN-1-0"
+  close:
+    - "sound: BLOCK_CHEST_CLOSE-1-0"

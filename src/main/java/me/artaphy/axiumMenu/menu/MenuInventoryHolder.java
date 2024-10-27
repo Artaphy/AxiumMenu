@@ -5,8 +5,14 @@ import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Represents a custom InventoryHolder for AxiumMenu menus.
- * This class is used to associate a Menu instance with a Bukkit Inventory.
+ * Custom InventoryHolder implementation for AxiumMenu menus.
+ * This class:
+ * - Associates Menu instances with Bukkit inventories
+ * - Provides menu context for inventory events
+ * - Ensures proper menu handling in the Bukkit inventory system
+ * <p>
+ * This implementation is crucial for identifying menu inventories
+ * and handling their events appropriately.
  */
 public class MenuInventoryHolder implements InventoryHolder {
 

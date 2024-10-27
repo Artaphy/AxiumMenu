@@ -21,7 +21,17 @@ import java.util.stream.Collectors;
 
 /**
  * Handles the main command execution for the AxiumMenu plugin.
- * This class is responsible for processing all subcommands of the plugin.
+ * Provides the following subcommands:
+ * - open <menu>: Opens a specified menu
+ * - reload: Reloads all menus and configurations
+ * - list: Lists all available menus
+ * - serve: Toggles auto-reload mode
+ * <p>
+ * Features:
+ * - Tab completion for all subcommands
+ * - Permission checking
+ * - Error handling and user feedback
+ * - Debug mode support
  */
 public class MainCommand implements CommandExecutor, TabCompleter {
 

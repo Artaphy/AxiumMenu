@@ -17,8 +17,16 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages the configuration files for the AxiumMenu plugin.
- * This includes settings, language files, and other configuration data.
+ * Manages configuration files and language resources for the AxiumMenu plugin.
+ * Handles:
+ * - Loading and saving of settings.yml
+ * - Management of language files
+ * - Configuration validation
+ * - Cache management for language strings
+ * - Debug mode settings
+ * <p>
+ * This class ensures thread-safe access to configuration data and implements
+ * efficient caching mechanisms for frequently accessed values.
  */
 public class ConfigManager {
 

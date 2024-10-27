@@ -16,16 +16,24 @@ import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import me.clip.placeholderapi.PlaceholderAPI;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.*;
+import java.util.Objects;
+import me.clip.placeholderapi.PlaceholderAPI;
 
 /**
  * Main class for the AxiumMenu plugin.
- * This class handles the initialization, enabling, and disabling of the plugin.
+ * This plugin provides a flexible and powerful menu system for Bukkit/Spigot servers.
+ * Features include:
+ * - YAML-based menu configuration
+ * - Dynamic menu loading and reloading
+ * - Support for conditional actions
+ * - PlaceholderAPI integration
+ * - Multi-language support
  */
 public final class AxiumMenu extends JavaPlugin {
 
@@ -225,8 +233,13 @@ public final class AxiumMenu extends JavaPlugin {
 
     @SuppressWarnings("all")
     public static String setPlaceholders(Player player, String text) {
-        if (placeholderAPIEnabled) {
-            return PlaceholderAPI.setPlaceholders(player, text);
+        if (placeholderAPIEnabled && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            try {
+                return PlaceholderAPI.setPlaceholders(player, text);
+            } catch (Exception e) {
+                Logger.error("Error setting placeholders: " + e.getMessage(), e);
+                return text;
+            }
         }
         return text;
     }
@@ -244,7 +257,7 @@ public final class AxiumMenu extends JavaPlugin {
 
             commandMap.register(command, new Command(command) {
                 @Override
-                public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+                public boolean execute(@NotNull CommandSender sender, @NotNull String commandLabel, String[] args) {
                     if (sender instanceof Player) {
                         menu.open((Player) sender);
                         return true;
@@ -264,7 +277,7 @@ public final class AxiumMenu extends JavaPlugin {
      */
     private void registerMainCommand() {
         MainCommand mainCommand = new MainCommand(this);
-        getCommand("axiummenu").setExecutor(mainCommand);
-        getCommand("axiummenu").setTabCompleter(mainCommand);
+        Objects.requireNonNull(getCommand("axiummenu")).setExecutor(mainCommand);
+        Objects.requireNonNull(getCommand("axiummenu")).setTabCompleter(mainCommand);
     }
 }

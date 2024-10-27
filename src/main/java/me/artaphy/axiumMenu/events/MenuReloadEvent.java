@@ -5,14 +5,25 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Event that is called when menus are reloaded.
- * This event is fired asynchronously.
+ * Represents a menu reload event in the AxiumMenu plugin.
+ * The plugin fires this event when:
+ * - The file watcher detects menu file changes in serve mode
+ * - A player executes the reload command
+ * - The plugin reloads its configuration
+ * <p>
+ * Other plugins can listen to this event to:
+ * - Clean up resources before menu reloading
+ * - Prepare data for new menu configurations
+ * - Synchronize their own menu-related features
+ * <p>
+ * This event runs asynchronously to prevent server lag during reloading.
  */
 public class MenuReloadEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
 
     /**
-     * Constructs a new MenuReloadEvent.
+     * Creates a new MenuReloadEvent.
+     * The constructor marks this event as asynchronous.
      */
     public MenuReloadEvent() {
         super(true); // This event is asynchronous
@@ -20,7 +31,7 @@ public class MenuReloadEvent extends Event {
 
     /**
      * Gets the handler list for this event.
-     * This method is required by Bukkit's event system.
+     * Bukkit requires this method for its event system.
      *
      * @return The handler list
      */
@@ -32,7 +43,7 @@ public class MenuReloadEvent extends Event {
 
     /**
      * Gets the handler list for this event.
-     * This static method is required by Bukkit's event system for proper event registration.
+     * Bukkit requires this static method for proper event registration.
      *
      * @return The handler list
      */

@@ -8,8 +8,14 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Event that is called when a menu is about to be opened for a player.
- * This event can be cancelled to prevent the menu from opening.
+ * Event that is fired when a menu is about to be opened for a player.
+ * This event is cancellable and allows other plugins to:
+ * - Prevent menus from being opened
+ * - Modify menu behavior before opening
+ * - Track menu usage
+ * <p>
+ * The event provides access to both the player and menu instances
+ * involved in the operation.
  */
 public class MenuOpenEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();

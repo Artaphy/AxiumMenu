@@ -16,8 +16,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 /**
- * Manages the creation, loading, and retrieval of menus for the AxiumMenu plugin.
- * This class handles menu caching, asynchronous loading, and provides thread-safe access to menus.
+ * Manages the lifecycle and access of menus in the AxiumMenu plugin.
+ * This class provides thread-safe menu operations, caching, and asynchronous loading capabilities.
+ * It handles menu registration, retrieval, and cleanup operations.
  */
 public class MenuManager {
 
@@ -26,6 +27,9 @@ public class MenuManager {
     private final Map<String, Menu> menuCache = new ConcurrentHashMap<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+    // 在类的顶部添加常量
+    private static final long MENU_CACHE_TIMEOUT = 30 * 60 * 1000; // 30分钟的超时时间
 
     /**
      * Constructs a new MenuManager instance.
@@ -39,10 +43,11 @@ public class MenuManager {
     }
 
     /**
-     * Loads all menus from the menu configuration files.
-     * This method clears existing menus and reloads them from the config files.
+     * Loads all menu files from the menus directory.
+     * This method is called during plugin startup and reload operations.
+     * It clears existing menus and reloads them from the filesystem.
      *
-     * @throws MenuLoadException if any menu fails to load
+     * @throws MenuLoadException if there are errors loading the menus
      */
     public void loadMenus() throws MenuLoadException {
         menus.values().forEach(Menu::markAsExpired);
@@ -97,11 +102,12 @@ public class MenuManager {
     }
 
     /**
-     * Retrieves a menu by its name.
+     * Retrieves a menu by its name with caching support.
+     * This method is thread-safe and uses a read lock to ensure consistency.
      *
-     * @param name The name of the menu to retrieve.
-     * @return The Menu instance.
-     * @throws MenuNotFoundException if the menu is not found.
+     * @param name The name of the menu to retrieve
+     * @return The requested Menu instance
+     * @throws MenuNotFoundException if the menu doesn't exist
      */
     public Menu getMenu(String name) throws MenuNotFoundException {
         lock.readLock().lock();
@@ -121,12 +127,26 @@ public class MenuManager {
     }
 
     /**
-     * Cleans the menu cache periodically.
-     * This method is called automatically by the scheduler.
+     * Performs periodic cleanup of the menu cache.
+     * This method is automatically called by the scheduler to prevent memory leaks.
      */
     private void cleanCache() {
         menuCache.clear();
         Logger.debug("Menu cache cleared");
+    }
+
+    /**
+     * Cleans up unused menus based on their last access time.
+     * This method removes menus that haven't been accessed for longer than the timeout period.
+     * Currently unused but retained for future implementation.
+     */
+    @SuppressWarnings("unused")
+    private void cleanupUnusedMenus() {
+        long currentTime = System.currentTimeMillis();
+        menus.entrySet().removeIf(entry -> {
+            Menu menu = entry.getValue();
+            return currentTime - menu.getLastAccessTime() > MENU_CACHE_TIMEOUT;
+        });
     }
 
     /**
@@ -153,11 +173,11 @@ public class MenuManager {
     }
 
     /**
-     * Retrieves a menu asynchronously by its name.
-     * This method is useful for loading menus without blocking the main thread.
+     * Retrieves a menu asynchronously.
+     * This method is useful for loading menus without blocking the main server thread.
      *
-     * @param name The name of the menu to retrieve.
-     * @return A CompletableFuture that will complete with the Menu instance, or complete exceptionally with a MenuNotFoundException.
+     * @param name The name of the menu to retrieve
+     * @return A CompletableFuture that will complete with the Menu instance
      */
     public CompletableFuture<Menu> getMenuAsync(String name) {
         return CompletableFuture.supplyAsync(() -> {
@@ -170,8 +190,8 @@ public class MenuManager {
     }
 
     /**
-     * Shuts down the MenuManager and its scheduler.
-     * This method should be called when the plugin is being disabled.
+     * Performs cleanup operations when the plugin is being disabled.
+     * Ensures proper shutdown of the scheduler and cleanup of resources.
      */
     public void shutdown() {
         scheduler.shutdown();

@@ -11,7 +11,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 
 /**
- * Utility class for handling color-related operations in AxiumMenu.
+ * Utility class for handling color codes and formatting in text.
+ * Supports:
+ * - Traditional color codes (&)
+ * - Hex colors (<#RRGGBB>)
+ * - Gradients (<gradient:#color1:#color2>text</gradient>)
+ * - Rainbow text (<rainbow>text</rainbow>)
+ * - Format codes (bold, italic, etc.)
+ * <p>
+ * This class implements caching to improve performance for frequently used strings.
  */
 public class ColorUtils {
    private static final Pattern HEX_PATTERN = Pattern.compile("<#([A-Fa-f0-9]{6})>");

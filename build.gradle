@@ -6,7 +6,6 @@ buildscript {
 
 plugins {
     id 'java'
-    id 'com.gradleup.shadow' version '8.3.2'
 }
 
 group = 'me.artaphy'
@@ -14,42 +13,23 @@ version = '1.0.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
-    maven {
-        name = "spigotmc-repo"
-        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
-    }
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/groups/public/"
-    }
-    maven {
-        name = "placeholderapi"
-        url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
-    }
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    maven { url 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
 }
 
 dependencies {
-    compileOnly 'org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT'
+    // Spigot-API
+    compileOnly 'org.spigotmc:spigot-api:1.21.3-R0.1-SNAPSHOT'
+    
+    // BungeeCord ChatComponent API
+    compileOnly 'net.md-5:bungeecord-chat:1.20-R0.2'
+    
+    // PlaceholderAPI
     compileOnly 'me.clip:placeholderapi:2.11.6'
-
-    implementation 'org.jetbrains:annotations:25.0.0'
-}
-
-def targetJavaVersion = 21
-java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release.set(targetJavaVersion)
-    }
+    
+    // JetBrains Annotations
+    compileOnly 'org.jetbrains:annotations:26.0.1'
 }
 
 processResources {
@@ -61,10 +41,6 @@ processResources {
     }
 }
 
-shadowJar {
-    archiveClassifier.set('')
-    archiveFileName = "${project.name}-${project.version}.jar"
-    relocate 'com.typesafe.config', 'me.artaphy.axiumMenu.libs.typesafe.config'
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
-
-build.dependsOn shadowJar

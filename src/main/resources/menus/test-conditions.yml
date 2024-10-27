@@ -1,0 +1,59 @@
+title: "&6Condition Test Menu"
+rows: 3
+type: CHEST
+
+layout:
+  - "#########"
+  - "#A B C D#"
+  - "#########"
+
+items:
+  '#':
+    material: LIGHT_GRAY_STAINED_GLASS_PANE
+    name: " "
+  'A':
+    material: DIAMOND_SWORD
+    name: "&bVIP Sword"
+    lore:
+      - "&7Only VIPs can get this"
+    actions:
+      - condition: "perm axiummenu.vip"
+        actions: 
+          - "command: give %player% diamond_sword 1"
+          - "tell: &aYou received a VIP sword!"
+        deny: "tell: &cYou need to be a VIP to get this!"
+  'B':
+    material: EXPERIENCE_BOTTLE
+    name: "&aLevel Boost"
+    lore:
+      - "&7Boost your level if below 10"
+    actions:
+      - condition: "check papi %player_level% < 10"
+        actions:
+          - "command: xp add %player% 100 levels"
+          - "tell: &aYour level has been boosted!"
+        deny: "tell: &cYour level is already 10 or higher!"
+  'C':
+    material: GOLDEN_APPLE
+    name: "&eHealth Boost"
+    lore:
+      - "&7Heal if health is low"
+    actions:
+      - condition: "check papi %player_health% < 10"
+        actions:
+          - "command: heal %player%"
+          - "tell: &aYou have been healed!"
+        deny: "tell: &cYour health is already high!"
+  'D':
+    material: BARRIER
+    name: "&cClose"
+    lore:
+      - "&7Click to close the menu"
+    actions:
+      - "close"
+
+events:
+  open:
+    - "sound: BLOCK_CHEST_OPEN-1-0"
+  close:
+    - "sound: BLOCK_CHEST_CLOSE-1-0"

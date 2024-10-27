@@ -1,25 +1,26 @@
 config:
-  loaded: "&aAxiumMenu 配置加载成功！"
+  loaded: "配置加载成功。"
+
 command:
   help:
-    title: "&6AxiumMenu 命令帮助："
-    open: "&d/axiummenu open <menu> &7- &f打开指定菜单"
-    reload: "&d/axiummenu reload &7- &f重新加载插件配置"
-    list: "&d/axiummenu list &7- &f显示所有可用菜单"
-    serve: "&d/axiummenu serve &7- &f切换菜单文件自动加载模式"
+    title: "&6=== AxiumMenu 帮助 ==="
+    open: "&e/axiummenu open <菜单名> &7- 打开菜单"
+    reload: "&e/axiummenu reload &7- 重载配置"
+    list: "&e/axiummenu list &7- 列出所有菜单"
+    serve: "&e/axiummenu serve &7- 切换服务模式"
   error:
-    usage_open: "&c用法: /axiummenu open <menu>"
-    player_only: "&c只有玩家可以打开菜单！"
-    menu_not_found: "&c找不到指定的菜单：{menu}"
-    menu_open_failed: "&c打开菜单时发生错误。请查看控制台以获取更多信息。"
-    menu_reload_failed: "&c菜单重新加载失败。请查看控制台以获取更多信息"
+    usage_open: "&c用法: /axiummenu open <菜单名>"
+    player_only: "&c该命令只能由玩家使用。"
+    menu_not_found: "&c未找到菜单: %menu%"
+    menu_open_failed: "&c打开菜单失败。"
+    menu_reload_failed: "&c重载菜单失败。"
   success:
-    menu_opened: "&a正在打开菜单：{title}"
-    config_reloaded: "&aAxiumMenu 配置已重新加载！"
+    menu_opened: "&a已打开菜单: {title}"
+    config_reloaded: "&a配置重载成功。"
   list:
-    title: "&6可用的菜单列表："
+    title: "&6=== 可用菜单 ==="
     empty: "&c没有可用的菜单。"
-    format: "&7- &e{name}&7: &f{title}"
+    format: "&e{name} &7- {title}"
   serve:
-    enabled: "&a菜单文件自动重载模式已启用"
-    disabled: "&c菜单文件自动重载模式已禁用"
+    enabled: "&a服务模式已启用。菜单文件修改时将自动重载。"
+    disabled: "&c服务模式已禁用。"
