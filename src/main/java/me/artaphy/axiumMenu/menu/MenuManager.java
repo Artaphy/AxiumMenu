@@ -45,11 +45,10 @@ public class MenuManager {
      * @throws MenuLoadException if any menu fails to load
      */
     public void loadMenus() throws MenuLoadException {
-        // 标记所有现有菜单为过期
         menus.values().forEach(Menu::markAsExpired);
         
         menus.clear();
-        menuCache.clear(); // 添加这一行
+        menuCache.clear();
         Path menuFolder = plugin.getDataFolder().toPath().resolve("menus");
         if (!Files.exists(menuFolder)) {
             try {
@@ -67,7 +66,6 @@ public class MenuManager {
                 throw new MenuLoadException("No menus were successfully loaded");
             }
 
-            // 修改这一行
             Logger.info("Menus loaded successfully. Total menus: " + menus.size());
         } catch (IOException e) {
             throw new MenuLoadException("Error accessing menu files", e);

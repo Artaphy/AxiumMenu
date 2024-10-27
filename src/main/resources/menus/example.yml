@@ -2,6 +2,16 @@ title: "<#114514>Hello AxiumMenu!"
 rows: 5
 type: CHEST
 
+activators:
+  command:
+    - cd
+  item:
+    material: compass
+    name: '&aMenu'
+    lore:
+      - ' '
+      - '&aClick to open'
+
 layout: |-
   #########
   |       |

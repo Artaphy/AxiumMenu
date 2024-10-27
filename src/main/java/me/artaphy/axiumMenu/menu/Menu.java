@@ -10,9 +10,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Represents a menu in the AxiumMenu plugin.
@@ -25,6 +23,7 @@ public class Menu {
     private final MenuType type;
     private final String layout;
     private final Map<Integer, MenuItem> items;
+    private final List<MenuActivator> activators;
     private boolean isExpired = false;
 
     /**
@@ -36,14 +35,16 @@ public class Menu {
      */
     public Menu(String name, ConfigurationSection config) throws MenuLoadException {
         this.name = name;
-        this.title = config.getString("title", "");
+        this.title = config.getString("title", "Default Title");
         this.rows = config.getInt("rows", 3);
         this.type = MenuType.fromString(config.getString("type", "CHEST"));
         this.layout = config.getString("layout", "");
         this.items = new HashMap<>();
+        this.activators = new ArrayList<>();
 
         validateConfig(config);
         loadItems(config.getConfigurationSection("items"));
+        loadActivators(config.getConfigurationSection("activators"));
     }
 
     /**
@@ -85,6 +86,31 @@ public class Menu {
             }
             if (c != '\n') {
                 index++;
+            }
+        }
+    }
+
+    /**
+     * Loads activators for this menu from the configuration.
+     *
+     * @param activatorsSection The configuration section containing activator details.
+     */
+    private void loadActivators(ConfigurationSection activatorsSection) {
+        if (activatorsSection == null) {
+            return;
+        }
+        for (String key : activatorsSection.getKeys(false)) {
+            ConfigurationSection section = activatorsSection.getConfigurationSection(key);
+            if (section != null) {
+                if (key.equals("command") || key.equals("chat")) {
+                    activators.add(new MenuActivator(section));
+                } else if (key.equals("item")) {
+                    activators.add(new MenuActivator(section));
+                }
+            } else {
+                if (key.equals("command") || key.equals("chat") || key.equals("item")) {
+                    activators.add(new MenuActivator(activatorsSection));
+                }
             }
         }
     }
@@ -170,9 +196,6 @@ public class Menu {
      * @throws MenuLoadException If the configuration is invalid.
      */
     private void validateConfig(ConfigurationSection config) throws MenuLoadException {
-        if (title.isEmpty()) {
-            throw new MenuLoadException("Missing or empty 'title' for menu: " + name);
-        }
         if (rows < 1 || rows > 6) {
             throw new MenuLoadException("Invalid 'rows' value: " + rows + ". Must be between 1 and 6 for menu: " + name);
         }
@@ -199,5 +222,14 @@ public class Menu {
 
     public boolean isExpired() {
         return isExpired;
+    }
+
+    /**
+     * Gets the list of activators for this menu.
+     *
+     * @return The list of MenuActivator objects for this menu.
+     */
+    public List<MenuActivator> getActivators() {
+        return activators;
     }
 }

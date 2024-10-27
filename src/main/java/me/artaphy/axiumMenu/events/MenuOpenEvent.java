@@ -33,7 +33,7 @@ public class MenuOpenEvent extends Event implements Cancellable {
      *
      * @return The player involved in this event.
      */
-    @SuppressWarnings("unused")
+    @SuppressWarnings("all")
     @NotNull
     public Player getPlayer() {
         return player;
@@ -87,8 +87,8 @@ public class MenuOpenEvent extends Event implements Cancellable {
      *
      * @return The handler list for this event.
      */
+    @SuppressWarnings("all")
     @NotNull
-    @SuppressWarnings("unused")
     public static HandlerList getHandlerList() {
         return HANDLERS;
     }

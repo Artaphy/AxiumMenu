@@ -36,8 +36,8 @@ public class MenuReloadEvent extends Event {
      *
      * @return The handler list
      */
+    @SuppressWarnings("all")
     @NotNull
-    @SuppressWarnings("unused")
     public static HandlerList getHandlerList() {
         return HANDLERS;
     }

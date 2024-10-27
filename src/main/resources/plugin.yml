@@ -2,7 +2,20 @@ name: AxiumMenu
 version: '${version}'
 main: me.artaphy.axiumMenu.AxiumMenu
 api-version: '1.21'
+authors: [Artaphy]
+description: A powerful and flexible menu system for Bukkit/Spigot servers.
+website: https://github.com/Artaphy/AxiumMenu
+
 commands:
   axiummenu:
+    description: Main command for AxiumMenu
+    usage: /<command> [subcommand]
     aliases: [am]
-    usage: /<command> [open|reload|list]
+
+permissions:
+  axiummenu.use:
+    description: Allows use of basic AxiumMenu commands
+    default: true
+  axiummenu.admin:
+    description: Allows use of AxiumMenu admin commands
+    default: op

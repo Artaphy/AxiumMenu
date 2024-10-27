@@ -11,14 +11,17 @@ import me.artaphy.axiumMenu.menu.MenuInventoryHolder;
 import me.artaphy.axiumMenu.menu.MenuManager;
 import me.artaphy.axiumMenu.utils.Logger;
 import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import me.clip.placeholderapi.PlaceholderAPI;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.*;
-import java.util.Objects;
 
 /**
  * Main class for the AxiumMenu plugin.
@@ -60,12 +63,11 @@ public final class AxiumMenu extends JavaPlugin {
         }
         
         // Register main command
-        MainCommand mainCommand = new MainCommand(this);
-        Objects.requireNonNull(getCommand("axiummenu")).setExecutor(mainCommand);
-        Objects.requireNonNull(getCommand("axiummenu")).setTabCompleter(mainCommand);
+        registerMainCommand();
         
         // Register menu listener
-        getServer().getPluginManager().registerEvents(new MenuListener(this), this);
+        MenuListener menuListener = new MenuListener(this);
+        getServer().getPluginManager().registerEvents(menuListener, this);
         
         Logger.info("AxiumMenu plugin has been enabled successfully!");
         
@@ -221,11 +223,48 @@ public final class AxiumMenu extends JavaPlugin {
         return instance;
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings("all")
     public static String setPlaceholders(Player player, String text) {
         if (placeholderAPIEnabled) {
             return PlaceholderAPI.setPlaceholders(player, text);
         }
         return text;
+    }
+
+    /**
+     * Dynamically registers a command for a menu.
+     * @param command The command to register.
+     * @param menu The menu to open when the command is executed.
+     */
+    public void registerMenuCommand(String command, Menu menu) {
+        try {
+            final Field bukkitCommandMap = Bukkit.getServer().getClass().getDeclaredField("commandMap");
+            bukkitCommandMap.setAccessible(true);
+            CommandMap commandMap = (CommandMap) bukkitCommandMap.get(Bukkit.getServer());
+
+            commandMap.register(command, new Command(command) {
+                @Override
+                public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+                    if (sender instanceof Player) {
+                        menu.open((Player) sender);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+
+            Logger.info("Registered command '" + command + "' for menu '" + menu.getName() + "'");
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            Logger.error("Failed to register command '" + command + "' for menu '" + menu.getName() + "'", e);
+        }
+    }
+
+    /**
+     * Registers the main command for the plugin.
+     */
+    private void registerMainCommand() {
+        MainCommand mainCommand = new MainCommand(this);
+        getCommand("axiummenu").setExecutor(mainCommand);
+        getCommand("axiummenu").setTabCompleter(mainCommand);
     }
 }

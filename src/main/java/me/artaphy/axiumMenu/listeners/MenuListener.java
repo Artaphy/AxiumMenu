@@ -5,6 +5,7 @@ import me.artaphy.axiumMenu.menu.Menu;
 import me.artaphy.axiumMenu.menu.MenuInventoryHolder;
 import me.artaphy.axiumMenu.menu.MenuItem;
 import me.artaphy.axiumMenu.exceptions.MenuNotFoundException;
+import me.artaphy.axiumMenu.menu.MenuActivator;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -12,7 +13,12 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
 import me.artaphy.axiumMenu.utils.Logger;
 
 /**
@@ -30,6 +36,22 @@ public class MenuListener implements Listener {
      */
     public MenuListener(AxiumMenu plugin) {
         this.plugin = plugin;
+        registerMenuCommands();
+    }
+
+    /**
+     * Registers all menu commands as defined in the menu configurations.
+     */
+    private void registerMenuCommands() {
+        for (Menu menu : plugin.getMenuManager().getAllMenus().values()) {
+            for (MenuActivator activator : menu.getActivators()) {
+                if (activator.getType() == MenuActivator.ActivatorType.COMMAND) {
+                    for (String command : activator.getCommands()) {
+                        plugin.registerMenuCommand(command, menu);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -145,5 +167,80 @@ public class MenuListener implements Listener {
             Logger.warn("Attempted to open non-existent menu: " + menuName);
             player.sendMessage("Sorry, that menu doesn't exist.");
         }
+    }
+
+    @EventHandler
+    public void onPlayerChat(AsyncPlayerChatEvent event) {
+        String message = event.getMessage().toLowerCase();
+        for (Menu menu : plugin.getMenuManager().getAllMenus().values()) {
+            for (MenuActivator activator : menu.getActivators()) {
+                if (activator.getType() == MenuActivator.ActivatorType.CHAT) {
+                    if (activator.getChatTriggers().contains(message)) {
+                        event.setCancelled(true);
+                        plugin.getServer().getScheduler().runTask(plugin, () -> menu.open(event.getPlayer()));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        ItemStack item = event.getItem();
+        if (item == null) return;
+
+        for (Menu menu : plugin.getMenuManager().getAllMenus().values()) {
+            for (MenuActivator activator : menu.getActivators()) {
+                if (activator.getType() == MenuActivator.ActivatorType.ITEM) {
+                    ItemStack triggerItem = activator.getItemTrigger();
+                    if (itemsMatch(item, triggerItem)) {
+                        event.setCancelled(true);
+                        menu.open(event.getPlayer());
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks if two ItemStacks match for the purpose of menu activation.
+     * This method is more lenient than a strict equality check.
+     *
+     * @param item The item being interacted with.
+     * @param triggerItem The item configured as a menu trigger.
+     * @return true if the items match, false otherwise.
+     */
+    private boolean itemsMatch(ItemStack item, ItemStack triggerItem) {
+        if (item.getType() != triggerItem.getType()) {
+            return false;
+        }
+
+        ItemMeta itemMeta = item.getItemMeta();
+        ItemMeta triggerMeta = triggerItem.getItemMeta();
+
+        // If trigger item has no meta, consider it a match
+        if (triggerMeta == null) {
+            return true;
+        }
+
+        // If trigger item has a name, check if it matches
+        if (triggerMeta.hasDisplayName()) {
+            if (itemMeta == null || !itemMeta.hasDisplayName() || 
+                !itemMeta.getDisplayName().equals(triggerMeta.getDisplayName())) {
+                return false;
+            }
+        }
+
+        // If trigger item has lore, check if it matches
+        if (triggerMeta.hasLore()) {
+            if (itemMeta == null || !itemMeta.hasLore() || 
+                !itemMeta.getLore().equals(triggerMeta.getLore())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
